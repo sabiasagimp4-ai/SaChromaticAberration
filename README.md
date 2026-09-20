@@ -31,7 +31,7 @@ YMM4用の映像エフェクトです。画面の中心から外側へ、赤・�
 
 ビルドした `SaChromaticAberration.dll` を、YMM4の
 
-`user\\plugin\\SaChromaticAberration\\`
+`user\plugin\SaChromaticAberration\`
 
 にコピーしてYMM4を再起動してください。
 
@@ -40,13 +40,13 @@ YMM4用の映像エフェクトです。画面の中心から外側へ、赤・�
 .NET 10 SDK、Windows SDK、YMM4本体のDLLが必要です。
 
 ```powershell
-$Ymm4DirPath = 'D:\\YukkuriMovieMaker_v4_Lite\\'
-$FxcPath = 'C:\\Program Files (x86)\\Windows Kits\\10\\bin\\10.0.26100.0\\x64\\fxc.exe'
-$D2DIncludePath = 'C:\\Program Files (x86)\\Windows Kits\\10\\Include\\10.0.26100.0\\um'
+$Ymm4DirPath = 'D:\YukkuriMovieMaker_v4_Lite\'
+$FxcPath = 'C:\Program Files (x86)\Windows Kits\10\bin\10.0.26100.0\x64\fxc.exe'
+$D2DIncludePath = 'C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\um'
 
-dotnet build .\\SaChromaticAberration.csproj -c Release \\
-  "-p:YMM4DirPath=$Ymm4DirPath" \\
-  "-p:FxcPath=$FxcPath" \\
+dotnet build .\SaChromaticAberration.csproj -c Release `
+  "-p:YMM4DirPath=$Ymm4DirPath" `
+  "-p:FxcPath=$FxcPath" `
   "-p:D2DIncludePath=$D2DIncludePath"
 ```
 
