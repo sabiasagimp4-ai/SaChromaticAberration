@@ -32,10 +32,10 @@ public enum ChromaticFalloffMode
     Exponential = 4,
 }
 
-[VideoEffect("色収差", ["フィルタ"], ["色収差", "chromatic aberration", "プリズム", "RGBずれ", "レンズ"], IsAviUtlSupported = false)]
+[VideoEffect("Sa_chromablur", ["フィルタ"], ["Sa_chromablur", "色収差", "chromatic aberration", "プリズム", "RGBずれ", "レンズ"], IsAviUtlSupported = false)]
 public sealed class ChromaticAberrationEffect : VideoEffectBase
 {
-    public override string Label => "色収差";
+    public override string Label => "Sa_chromablur";
 
     [Display(Name = "収差", Description = "中心から外側へ色をずらす量", Order = 0)]
     [AnimationSlider("F1", "px", 0, 2000)]
