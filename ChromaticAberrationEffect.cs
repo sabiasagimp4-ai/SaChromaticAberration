@@ -15,7 +15,7 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
 
     [Display(Name = "収差", Description = "中心から外側へ色をずらす量", Order = 0)]
     [AnimationSlider("F1", "px", 0, 300)]
-    public Animation Aberration { get; } = new(60, 0, YMM4Constants.VeryLargeValue);
+    public Animation Aberration { get; } = new(40, 0, YMM4Constants.VeryLargeValue);
 
     [Display(Name = "減衰", Description = "中心から離れるほど収差が強くなる度合い。2 で逆二乗式 (中心が鮮明、周辺が大きく滲む)。0 で全面均一", Order = 1)]
     [AnimationSlider("F2", "", 0, 4)]
@@ -23,7 +23,7 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
 
     [Display(Name = "ラジアル", Description = "中心まわりにねじりながら色をずらす角度", Order = 2)]
     [AnimationSlider("F1", "°", -180, 180)]
-    public Animation Radial { get; } = new(0, -YMM4Constants.VeryLargeValue, YMM4Constants.VeryLargeValue);
+    public Animation Radial { get; } = new(8, -YMM4Constants.VeryLargeValue, YMM4Constants.VeryLargeValue);
 
     [Display(Name = "スケール", Description = "色ごとに拡大率を変えてずらす量", Order = 3)]
     [AnimationSlider("F1", "%", -50, 50)]
