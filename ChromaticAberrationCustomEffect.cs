@@ -21,6 +21,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
     public float FalloffPower { set => SetValue((int)Impl.Properties.FalloffPower, value); }
     public float RadiusScale { set => SetValue((int)Impl.Properties.RadiusScale, value); }
     public int FalloffMode { set => SetValue((int)Impl.Properties.FalloffMode, value); }
+    public int ScaleMode { set => SetValue((int)Impl.Properties.ScaleMode, value); }
+    public int FalloffTarget { set => SetValue((int)Impl.Properties.FalloffTarget, value); }
 
     [CustomEffect(1)]
     internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
@@ -59,6 +61,12 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
 
         [CustomEffectProperty(PropertyType.Int32, (int)Properties.FalloffMode)]
         public int FalloffMode { get => constants.FalloffMode; set { constants.FalloffMode = Math.Clamp(value, 0, 4); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.ScaleMode)]
+        public int ScaleMode { get => constants.ScaleMode; set { constants.ScaleMode = Math.Clamp(value, 0, 1); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.FalloffTarget)]
+        public int FalloffTarget { get => constants.FalloffTarget; set { constants.FalloffTarget = Math.Clamp(value, 0, 3); UpdateConstants(); } }
 
         public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
 
@@ -101,7 +109,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             public float FalloffPower;
             public float RadiusScale;
             public int FalloffMode;
-            public Vector2 Padding;
+            public int ScaleMode;
+            public int FalloffTarget;
         }
 
         internal enum Properties
@@ -117,6 +126,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             FalloffPower = 8,
             RadiusScale = 9,
             FalloffMode = 10,
+            ScaleMode = 11,
+            FalloffTarget = 12,
         }
     }
 }

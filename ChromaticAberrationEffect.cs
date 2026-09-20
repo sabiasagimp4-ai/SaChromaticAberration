@@ -8,6 +8,20 @@ using YukkuriMovieMaker.Plugin.Effects;
 
 namespace SaChromaticAberration;
 
+public enum ChromaticScaleMode
+{
+    [Display(Name = "線形（従来）")] Linear = 0,
+    [Display(Name = "指数（反転なし）")] Exponential = 1,
+}
+
+public enum ChromaticFalloffTarget
+{
+    [Display(Name = "収差のみ（従来）")] AberrationOnly = 0,
+    [Display(Name = "収差＋ラジアル")] WithRadial = 1,
+    [Display(Name = "収差＋スケール")] WithScale = 2,
+    [Display(Name = "すべて")] All = 3,
+}
+
 public enum ChromaticFalloffMode
 {
     [Display(Name = "冪乗（設定値）")]
@@ -74,6 +88,16 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
     [Display(Name = "強さ", Description = "元の映像との合成量", Order = 9)]
     [AnimationSlider("F1", "%", 0, 100)]
     public Animation Mix { get; } = new(100, 0, 100);
+
+    [Display(Name = "スケール方式", Description = "指数は倍率が常に正になり、強い設定でも中心を挟んだ反転を防ぎます", Order = 10)]
+    [EnumComboBox]
+    public ChromaticScaleMode ScaleMode { get => scaleMode; set => Set(ref scaleMode, value); }
+    ChromaticScaleMode scaleMode = ChromaticScaleMode.Linear;
+
+    [Display(Name = "半径・減衰の適用先", Description = "収差に加えてラジアルとスケールにも同じ半径・減衰曲線を適用します", Order = 11)]
+    [EnumComboBox]
+    public ChromaticFalloffTarget FalloffTarget { get => falloffTarget; set => Set(ref falloffTarget, value); }
+    ChromaticFalloffTarget falloffTarget = ChromaticFalloffTarget.AberrationOnly;
 
     public override IEnumerable<string> CreateExoVideoFilters(int keyFrameIndex, ExoOutputDescription exoOutputDescription) => [];
 
