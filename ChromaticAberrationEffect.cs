@@ -32,6 +32,27 @@ public enum ChromaticFalloffMode
     Exponential = 4,
 }
 
+public enum ChromaticColorSpaceMode
+{
+    [Display(Name = "RGB（従来）")]
+    Rgb = 0,
+
+    [Display(Name = "TOS-1（ねじれ対立色）")]
+    TwistedOpponent = 1,
+
+    [Display(Name = "LRS-1（対数比）")]
+    LogRatio = 2,
+
+    [Display(Name = "MOS-1（メビウス対立色）")]
+    MobiusOpponent = 3,
+
+    [Display(Name = "RSS-1（正弦シアー）")]
+    SineShear = 4,
+
+    [Display(Name = "HCS-1（双曲交差）")]
+    HyperbolicCross = 5,
+}
+
 [VideoEffect("色収差", ["フィルタ"], ["色収差", "chromatic aberration", "プリズム", "RGBずれ", "レンズ"], IsAviUtlSupported = false)]
 public sealed class ChromaticAberrationEffect : VideoEffectBase
 {
@@ -77,11 +98,16 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
     public int Steps { get => steps; set => Set(ref steps, Math.Clamp(value, 2, 2048)); }
     int steps = 32;
 
-    [Display(Name = "強さ", Description = "元の映像との合成量", Order = 9)]
+    [Display(Name = "色空間", Description = "分光処理を行う3成分の表現。RGB以外は実験的な可逆変換です", Order = 9)]
+    [EnumComboBox]
+    public ChromaticColorSpaceMode ColorSpace { get => colorSpace; set => Set(ref colorSpace, value); }
+    ChromaticColorSpaceMode colorSpace = ChromaticColorSpaceMode.Rgb;
+
+    [Display(Name = "強さ", Description = "元の映像との合成量", Order = 10)]
     [AnimationSlider("F1", "%", 0, 100)]
     public Animation Mix { get; } = new(100, 0, 100);
 
-    [Display(Name = "スケール方式", Description = "絶対値は負の倍率を折り返し、指数は倍率が常に正になります。どちらも中心を挟んだ反転を防ぎます", Order = 10)]
+    [Display(Name = "スケール方式", Description = "絶対値は負の倍率を折り返し、指数は倍率が常に正になります。どちらも中心を挟んだ反転を防ぎます", Order = 11)]
     [EnumComboBox]
     public ChromaticScaleMode ScaleMode { get => scaleMode; set => Set(ref scaleMode, value); }
     ChromaticScaleMode scaleMode = ChromaticScaleMode.Absolute;
