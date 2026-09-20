@@ -3,15 +3,13 @@ name: Release
 # Builds the plugin on Windows (fxc.exe and the Direct2D headers ship only with
 # the Windows SDK) and attaches the .ymme package to a GitHub Release.
 #
-# Requires the repository variable YMM4_DOWNLOAD_URL: a direct link to the YMM4
-# archive whose reference assemblies the plugin compiles against. YMM4 is not
-# redistributable through NuGet, so CI has to fetch it the same way a developer
-# installs it. Set it under Settings > Secrets and variables > Actions >
-# Variables, or pass ymm4_url when running the workflow by hand.
+# Uses the official YMM4 Lite download by default. The repository variable or
+# workflow input can override it for a pinned host version.
 
 on:
   push:
     tags: ['v*']
+    branches: ['claude/image-parameter-strength-f40n2s']
   workflow_dispatch:
     inputs:
       tag:
@@ -26,6 +24,7 @@ permissions:
 
 jobs:
   release:
+    if: startsWith(github.ref, 'refs/tags/') || github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[release v1.0.0]')
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -52,7 +51,7 @@ jobs:
       - name: Fetch the YMM4 reference assemblies
         shell: pwsh
         env:
-          YMM4_URL: ${{ github.event.inputs.ymm4_url || vars.YMM4_DOWNLOAD_URL }}
+          YMM4_URL: ${{ github.event.inputs.ymm4_url || vars.YMM4_DOWNLOAD_URL || 'https://object-storage.tyo1.conoha.io/v1/nc_4fac3ef0e6d843249e0ab2f1fc3e8f85/public/YukkuriMovieMaker_v4_Lite.zip' }}
         run: |
           if (-not $env:YMM4_URL) {
             throw 'Set the repository variable YMM4_DOWNLOAD_URL to a direct link to the YMM4 archive, or pass ymm4_url when dispatching this workflow.'
@@ -91,14 +90,16 @@ jobs:
         shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag }}
         run: |
-          $tag = '${{ github.event.inputs.tag }}'
+          $tag = $env:RELEASE_TAG
+          if ($env:GITHUB_REF -eq 'refs/heads/claude/image-parameter-strength-f40n2s' -and -not $tag) { $tag = 'v1.0.0' }
           if ($env:GITHUB_REF -like 'refs/tags/*') { $tag = $env:GITHUB_REF -replace '^refs/tags/', '' }
           if (-not $tag) { throw 'No tag to publish under.' }
           gh release view $tag 2>$null | Out-Null
           if ($LASTEXITCODE -eq 0) {
             gh release upload $tag dist\SaChromaticAberration.ymme --clobber
           } else {
-            gh release create $tag dist\SaChromaticAberration.ymme --title $tag --generate-notes
+            gh release create $tag dist\SaChromaticAberration.ymme --title $tag --target $env:GITHUB_SHA --generate-notes
           }
           if ($LASTEXITCODE -ne 0) { throw 'Publishing the release failed.' }
