@@ -55,6 +55,22 @@ $D2DIncludePath = 'C:\Program Files (x86)\Windows Kits\10\Include\10.0.26100.0\u
 dotnet build .\SaChromaticAberration.csproj -c Release "-p:YMM4DirPath=$Ymm4DirPath" "-p:FxcPath=$FxcPath" "-p:D2DIncludePath=$D2DIncludePath"
 ```
 
+## リリース (.ymme) の作り方
+
+`.github/workflows/release.yml` が Windows ランナー上でビルドし、`.ymme` を GitHub Release に添付します。
+fxc.exe と Direct2D のヘッダーは Windows SDK にしか無いので、ビルドは Windows 上でしか通りません。
+
+1. リポジトリの `Settings` → `Secrets and variables` → `Actions` → `Variables` で
+   `YMM4_DOWNLOAD_URL` に YMM4 アーカイブの直リンクを設定します。
+   参照アセンブリ (`YukkuriMovieMaker.Plugin.dll` など) は NuGet に無く YMM4 本体にしか同梱されないため、
+   CI も開発者と同じ方法で取得する必要があります。
+2. `v` で始まるタグを push すると、ビルドから Release への添付までが自動で走ります。
+   `Actions` タブから手動実行し、`tag` と `ymm4_url` を直接渡すこともできます。
+
+`.ymme` はビルドした DLL を zip 圧縮して拡張子を変えただけのもので、YMM4 がワンクリックで導入できます。
+このワークフローは DLL を書庫の直下に入れます。YMM4 側が別の階層を要求する場合は
+`Package as .ymme` ステップを調整してください。
+
 ## インストール
 
 `bin\Release\net10.0-windows10.0.19041.0\SaChromaticAberration.dll` を
