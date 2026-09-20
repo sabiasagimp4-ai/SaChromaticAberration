@@ -76,14 +76,9 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         effect.MixAmount = (float)(item.Mix.GetValue(frame, length, fps) / 100d);
         effect.FalloffPower = (float)falloffPower;
 
-        //サンプル間隔が1px未満になる分は描画に効かないので、上限をずれ量に合わせて下げる
-        var width = (double)bounds.Right - bounds.Left;
-        var height = (double)bounds.Bottom - bounds.Top;
-        var maxRadius = Math.Sqrt(width * width + height * height) / 2 + Math.Sqrt(centerX * centerX + centerY * centerY);
-        //収差は中心から離れるほど強くなるので、最も強い角を基準にする
-        var falloffMax = ChromaticAberrationCustomEffect.Impl.FalloffMax(width, height, falloffPower, centerX, centerY);
-        var needed = 2 * Math.Abs(aberration) * falloffMax + 2 * maxRadius * (Math.Abs(scaleAmount) + Math.Abs(radialAngle));
-        effect.StepCount = (int)Math.Clamp(Math.Ceiling(needed), 2, item.Steps);
+        // The shader uses one sample for each RGB channel. Keep the old constant
+        // populated so projects saved with the previous version remain compatible.
+        effect.StepCount = 3;
 
         return effectDescription.DrawDescription;
     }
