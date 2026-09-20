@@ -1,0 +1,98 @@
+name: Release
+
+# Windows SDKのfxc.exeを使ってYMM4プラグインをビルドし、
+# .ymmeをGitHub Releaseに添付します。
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Tag to publish the release under (e.g. v1.1.0)'
+        required: true
+      ymm4_url:
+        description: 'Override for the YMM4_DOWNLOAD_URL variable'
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Locate the Windows SDK shader compiler
+        shell: pwsh
+        run: |
+          $root = 'C:\Program Files (x86)\Windows Kits\10'
+          $bin = Get-ChildItem (Join-Path $root 'bin') -Directory -ErrorAction SilentlyContinue |
+            Where-Object { $_.Name -match '^10\.' -and (Test-Path (Join-Path $_.FullName 'x64\fxc.exe')) } |
+            Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $bin) { throw 'fxc.exe was not found in the Windows SDK on this runner.' }
+          $include = Get-ChildItem (Join-Path $root 'Include') -Directory -ErrorAction SilentlyContinue |
+            Where-Object { Test-Path (Join-Path $_.FullName 'um\d2d1effecthelpers.hlsli') } |
+            Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $include) { throw 'd2d1effecthelpers.hlsli was not found in the Windows SDK on this runner.' }
+          "FXC_PATH=$(Join-Path $bin.FullName 'x64\fxc.exe')" >> $env:GITHUB_ENV
+          "D2D_INCLUDE_PATH=$(Join-Path $include.FullName 'um')" >> $env:GITHUB_ENV
+
+      - name: Fetch the YMM4 reference assemblies
+        shell: pwsh
+        env:
+          YMM4_URL: ${{ github.event.inputs.ymm4_url || vars.YMM4_DOWNLOAD_URL || 'https://object-storage.tyo1.conoha.io/v1/nc_4fac3ef0e6d843249e0ab2f1fc3e8f85/public/YukkuriMovieMaker_v4_Lite.zip' }}
+        run: |
+          if (-not $env:YMM4_URL) {
+            throw 'Set the repository variable YMM4_DOWNLOAD_URL to a direct link to the YMM4 archive, or pass ymm4_url when dispatching this workflow.'
+          }
+          Invoke-WebRequest $env:YMM4_URL -OutFile ymm4.zip
+          Expand-Archive ymm4.zip -DestinationPath ymm4 -Force
+          $plugin = Get-ChildItem ymm4 -Recurse -Filter 'YukkuriMovieMaker.Plugin.dll' | Select-Object -First 1
+          if (-not $plugin) { throw 'YukkuriMovieMaker.Plugin.dll was not found in the downloaded archive.' }
+          # MSBuild needs a trailing separator. Use a forward slash so native quoting
+          # does not consume a trailing backslash.
+          $dir = $plugin.Directory.FullName -replace '\\', '/'
+          "YMM4_DIR_PATH=$dir/" >> $env:GITHUB_ENV
+
+      - name: Build
+        shell: pwsh
+        run: |
+          dotnet build .\SaChromaticAberration.csproj -c Release `
+            "-p:YMM4DirPath=$env:YMM4_DIR_PATH" `
+            "-p:FxcPath=$env:FXC_PATH" `
+            "-p:D2DIncludePath=$env:D2D_INCLUDE_PATH"
+
+      - name: Package as .ymme
+        shell: pwsh
+        run: |
+          $dll = Get-ChildItem bin\Release -Recurse -Filter 'SaChromaticAberration.dll' | Select-Object -First 1
+          if (-not $dll) { throw 'The build did not produce SaChromaticAberration.dll.' }
+          New-Item -ItemType Directory -Path dist\payload -Force | Out-Null
+          Copy-Item $dll.FullName dist\payload\
+          # A .ymme is the plugin zip renamed for YMM4 installation.
+          Compress-Archive -Path dist\payload\* -DestinationPath dist\Sa_chromablur.zip -Force
+          Move-Item dist\Sa_chromablur.zip dist\Sa_chromablur.ymme -Force
+          Get-FileHash dist\Sa_chromablur.ymme -Algorithm SHA256 | Format-List
+
+      - name: Publish the release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.tag }}
+        run: |
+          $tag = $env:RELEASE_TAG
+          if ($env:GITHUB_REF -like 'refs/tags/*') { $tag = $env:GITHUB_REF -replace '^refs/tags/', '' }
+          if (-not $tag) { throw 'No tag to publish under.' }
+          gh release view $tag 2>$null | Out-Null
+          if ($LASTEXITCODE -eq 0) {
+            gh release upload $tag dist\Sa_chromablur.ymme --clobber
+          } else {
+            gh release create $tag dist\Sa_chromablur.ymme --title $tag --target $env:GITHUB_SHA --generate-notes
+          }
+          if ($LASTEXITCODE -ne 0) { throw 'Publishing the release failed.' }
