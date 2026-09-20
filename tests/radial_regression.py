@@ -29,12 +29,12 @@ def falloff_value(radius, power, mode):
 
 
 def scale_zoom(shift, scale_mode):
-    return np.exp(np.clip(shift, -16, 16)) if scale_mode == 1 else 1 + shift
+    return np.exp(np.clip(shift, -16, 16)) if scale_mode == 1 else np.abs(1 + shift)
 
 
 def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
            offset=(0, 0), fixed=True, mix=1, radius=1, mode=0,
-           scale_mode=0, falloff_target=0):
+           scale_mode=0):
     h, w = src.shape[:2]
     if fixed and (mix == 0 or (radial == 0 and aberration == 0 and scale == 0)):
         return src.copy()
@@ -44,8 +44,6 @@ def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
     distance = np.hypot(dx, dy)
     ux, uy = dx / np.maximum(distance, 1e-5), dy / np.maximum(distance, 1e-5)
     falloff = falloff_value(np.hypot(dx / (w / 2), dy / (h / 2)) / max(radius, 1e-4), power, mode)
-    radial_factor = falloff if falloff_target & 1 else 1
-    scale_factor = falloff if falloff_target & 2 else 1
     colors = np.zeros((h, w, 3))
     coverage = np.zeros_like(colors)
     alpha = np.zeros((h, w, 1))
@@ -64,8 +62,8 @@ def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
         return out
     for t in np.linspace(0, 1, steps):
         s = 2*t-1
-        a = np.deg2rad(radial)*radial_factor*s
-        zoom = scale_zoom(scale*scale_factor*s, scale_mode)
+        a = np.deg2rad(radial)*falloff*s
+        zoom = scale_zoom(scale*falloff*s, scale_mode)
         qx = cx + (dx*np.cos(a)-dy*np.sin(a))*zoom + ux*aberration*falloff*s - .5
         qy = cy + (dx*np.sin(a)+dy*np.cos(a))*zoom + uy*aberration*falloff*s - .5
         smp = sample(qx, qy)
@@ -117,33 +115,35 @@ def checks():
     assert np.allclose(zoom * scale_zoom(-shifts, 1), 1)
     assert np.allclose(scale_zoom(np.array([-1e-5, 1e-5]), 1), [1-1e-5, 1+1e-5], atol=1e-9)
     new_count = 0
-    for target in range(4):
+    assert np.array_equal(scale_zoom(np.array([-3, -1, 0, 1, 3]), 0), [2, 0, 1, 2, 4])
+    assert (scale_zoom(shifts, 0) >= 0).all()
+    for radius in (.01, .5, 1, 2):
         for scale_mode in range(2):
             for scale in (-10, -3, 0, 3, 10):
                 out = render(opaque, scale=scale, radial=720, aberration=0,
-                             radius=.01, power=32, steps=300,
-                             scale_mode=scale_mode, falloff_target=target)
+                             radius=radius, power=32, steps=300,
+                             scale_mode=scale_mode)
                 assert np.isfinite(out).all()
                 assert np.allclose(out[..., 3], 1)
                 new_count += 1
-            assert np.array_equal(render(opaque, mix=0, scale_mode=scale_mode, falloff_target=target), opaque)
-            assert np.array_equal(render(transparent, scale=3, scale_mode=scale_mode, falloff_target=target), transparent)
-            out = render(mask, scale=3, scale_mode=scale_mode, falloff_target=target)
+            assert np.array_equal(render(opaque, mix=0, scale_mode=scale_mode), opaque)
+            assert np.array_equal(render(transparent, scale=3, scale_mode=scale_mode), transparent)
+            out = render(mask, scale=3, scale_mode=scale_mode)
             assert np.isfinite(out).all() and (out[..., :3] <= out[..., 3:] + 1e-9).all()
-    # At power=0 all distance factors equal 1, independent of radius/target.
+    # At power=0 all distance factors equal 1, independent of radius.
     for scale_mode in range(2):
         base = render(opaque, scale=3, power=0, scale_mode=scale_mode)
-        for target in range(4):
-            assert np.array_equal(base, render(opaque, scale=3, power=0, radius=.1,
-                                               scale_mode=scale_mode, falloff_target=target))
-    # Radius must affect only the selected transform when aberration is zero.
-    for radial, scale, selected, unselected in ((45, 0, 1, 2), (0, .5, 2, 1)):
-        def trial(radius, target):
-            return render(opaque, radial=radial, scale=scale, aberration=0,
-                          radius=radius, falloff_target=target, scale_mode=1)
-        assert np.array_equal(trial(.5, unselected), trial(2, unselected))
-        assert not np.allclose(trial(.5, selected), trial(2, selected))
-    print(f'PASS: {new_count} new-mode settings at 300 steps; positive reciprocal zoom, target isolation, alpha, identity')
+        assert np.array_equal(base, render(opaque, scale=3, power=0, radius=.1, scale_mode=scale_mode))
+    # Both transforms must respond to radius without requiring an opt-in.
+    for scale_mode in range(2):
+        for radial, scale in ((45, 0), (0, .5)):
+            def trial(radius):
+                return render(opaque, radial=radial, scale=scale, aberration=0,
+                              radius=radius, scale_mode=scale_mode)
+            assert not np.allclose(trial(.5), trial(2))
+    out = render(opaque, radial=45, scale=3, aberration=0)
+    assert np.allclose(out[6, 11], opaque[6, 11])  # Exact center stays fixed.
+    print(f'PASS: {new_count} settings at 300 steps; absolute/exponential zoom, shared radius, alpha, fixed center')
 
 
 if __name__ == '__main__':

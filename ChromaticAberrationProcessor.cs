@@ -69,7 +69,6 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         var radiusScale = Math.Clamp(item.Radius.GetValue(frame, length, fps) / 100d, 0.01d, 100d);
         var falloffMode = item.FalloffMode;
         var scaleMode = Math.Clamp((int)item.ScaleMode, 0, 1);
-        var falloffTarget = Math.Clamp((int)item.FalloffTarget, 0, 3);
 
         effect.ImageRect = new Vector4(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
         effect.CenterOffsetX = (float)centerX;
@@ -82,7 +81,6 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         effect.RadiusScale = (float)radiusScale;
         effect.FalloffMode = (int)falloffMode;
         effect.ScaleMode = scaleMode;
-        effect.FalloffTarget = falloffTarget;
 
         //サンプル間隔が1px未満になる分は描画に効かないので、上限をずれ量に合わせて下げる
         var width = (double)bounds.Right - bounds.Left;
@@ -102,17 +100,12 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
             ? (Math.Pow(2d, Math.Min(effectivePower * normalizedMax, 64d)) - 1d) / Math.Max(Math.Pow(2d, effectivePower) - 1d, 1e-5d)
             : Math.Pow(Math.Max(normalizedMax, 0d), effectivePower);
         falloffMax = Math.Clamp(falloffMax, 0d, 1e6d);
-        var needed = 2 * Math.Abs(aberration) * falloffMax + 2 * maxRadius * (Math.Abs(scaleAmount) + Math.Abs(radialAngle));
-        if (scaleMode != 0 || falloffTarget != 0)
-        {
-            var radialMax = Math.Abs(radialAngle) * ((falloffTarget & 1) != 0 ? falloffMax : 1d);
-            var scaleMax = Math.Abs(scaleAmount) * ((falloffTarget & 2) != 0 ? falloffMax : 1d);
-            var zoomMax = scaleMode == 1 ? Math.Exp(Math.Min(scaleMax, 16d)) : 1d + scaleMax;
-            var zoomSlope = scaleMode == 1 ? scaleMax * zoomMax : scaleMax;
-            // Bound the derivative of rotated * zoom with respect to wavelength.
-            // Keep the original estimate unchanged when both new controls are off.
-            needed = 2 * Math.Abs(aberration) * falloffMax + 2 * maxRadius * (zoomSlope + radialMax * zoomMax);
-        }
+        var radialMax = Math.Abs(radialAngle) * falloffMax;
+        var scaleMax = Math.Abs(scaleAmount) * falloffMax;
+        var zoomMax = scaleMode == 1 ? Math.Exp(Math.Min(scaleMax, 16d)) : 1d + scaleMax;
+        var zoomSlope = scaleMode == 1 ? scaleMax * zoomMax : scaleMax;
+        // Absolute value preserves the linear slope magnitude, including across zero.
+        var needed = 2 * Math.Abs(aberration) * falloffMax + 2 * maxRadius * (zoomSlope + radialMax * zoomMax);
         effect.StepCount = (int)Math.Clamp(Math.Ceiling(needed), 2, item.Steps);
 
         return effectDescription.DrawDescription;

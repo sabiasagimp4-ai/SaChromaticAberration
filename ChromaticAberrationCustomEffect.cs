@@ -22,7 +22,6 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
     public float RadiusScale { set => SetValue((int)Impl.Properties.RadiusScale, value); }
     public int FalloffMode { set => SetValue((int)Impl.Properties.FalloffMode, value); }
     public int ScaleMode { set => SetValue((int)Impl.Properties.ScaleMode, value); }
-    public int FalloffTarget { set => SetValue((int)Impl.Properties.FalloffTarget, value); }
 
     [CustomEffect(1)]
     internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
@@ -65,9 +64,6 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
         [CustomEffectProperty(PropertyType.Int32, (int)Properties.ScaleMode)]
         public int ScaleMode { get => constants.ScaleMode; set { constants.ScaleMode = Math.Clamp(value, 0, 1); UpdateConstants(); } }
 
-        [CustomEffectProperty(PropertyType.Int32, (int)Properties.FalloffTarget)]
-        public int FalloffTarget { get => constants.FalloffTarget; set { constants.FalloffTarget = Math.Clamp(value, 0, 3); UpdateConstants(); } }
-
         public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
 
         protected override void UpdateConstants() => drawInformation?.SetPixelShaderConstantBuffer(constants);
@@ -95,7 +91,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             return Math.Pow(Math.Sqrt(nx * nx + ny * ny), power);
         }
 
-        [StructLayout(LayoutKind.Sequential)]
+        [StructLayout(LayoutKind.Sequential, Size = 64)]
         struct Constants
         {
             public Vector4 ImageRect;
@@ -110,7 +106,6 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             public float RadiusScale;
             public int FalloffMode;
             public int ScaleMode;
-            public int FalloffTarget;
         }
 
         internal enum Properties
@@ -127,7 +122,6 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             RadiusScale = 9,
             FalloffMode = 10,
             ScaleMode = 11,
-            FalloffTarget = 12,
         }
     }
 }
