@@ -66,9 +66,17 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
 
         public override void MapOutputRectToInputRects(RawRect outputRect, RawRect[] inputRects)
         {
-            // Channel separation and edge clamping can read any part of the source,
-            // including pixels far outside a requested output tile. Request the complete input.
+            // Rotation and edge clamping can read any part of the source, including
+            // pixels far outside a requested output tile. Request the complete input.
             inputRects[0] = inputRect;
+        }
+
+        /// <summary>収差量に掛かる距離係数の最大値。正規化半径が最大になるのは中心から最も遠い角。</summary>
+        internal static double FalloffMax(double width, double height, double power, double offsetX = 0, double offsetY = 0)
+        {
+            var nx = 1 + Math.Abs(offsetX) / Math.Max(width / 2, 1e-5);
+            var ny = 1 + Math.Abs(offsetY) / Math.Max(height / 2, 1e-5);
+            return Math.Pow(Math.Sqrt(nx * nx + ny * ny), power);
         }
 
         [StructLayout(LayoutKind.Sequential)]
@@ -99,3 +107,4 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
         }
     }
 }
+

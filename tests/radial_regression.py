@@ -18,6 +18,9 @@ def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
     radius = np.hypot(dx, dy)
     ux, uy = dx / np.maximum(radius, 1e-5), dy / np.maximum(radius, 1e-5)
     falloff = np.hypot(dx / (w / 2), dy / (h / 2)) ** power
+    colors = np.zeros((h, w, 3))
+    coverage = np.zeros_like(colors)
+    alpha = np.zeros((h, w, 1))
     # Input and output use premultiplied RGBA, as Direct2D does.
     def sample(qx, qy):
         if fixed:
@@ -31,22 +34,20 @@ def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
             valid = (xx >= 0) & (xx < w) & (yy >= 0) & (yy < h)
             out += src[np.clip(yy, 0, h-1), np.clip(xx, 0, w-1)] * (weight * valid)[..., None]
         return out
-    a = np.deg2rad(radial)
-    separation_x = ux*np.cos(a) - uy*np.sin(a)
-    separation_y = ux*np.sin(a) + uy*np.cos(a)
-
-    def sample_channel(s, channel):
-        qx = cx + dx*(1 + scale*s) + separation_x*aberration*falloff*s - .5
-        qy = cy + dy*(1 + scale*s) + separation_y*aberration*falloff*s - .5
+    for t in np.linspace(0, 1, steps):
+        s = 2*t-1
+        a = np.deg2rad(radial)*s
+        qx = cx + (dx*np.cos(a)-dy*np.sin(a))*(1+scale*s) + ux*aberration*falloff*s - .5
+        qy = cy + (dx*np.sin(a)+dy*np.cos(a))*(1+scale*s) + uy*aberration*falloff*s - .5
         smp = sample(qx, qy)
-        return np.divide(smp[..., channel], smp[..., 3], out=np.zeros((h, w)), where=smp[..., 3] > 0)
-
-    color = np.stack((sample_channel(1, 0), sample_channel(0, 1), sample_channel(-1, 2)), axis=2)
-    # Preserve the source alpha. This is the behavior needed for transparent
-    # video layers: color separation must not turn the frame into a transparent veil.
-    alpha = src[..., 3:4]
-    result = np.concatenate((np.clip(color, 0, 1)*alpha, alpha), axis=2)
-    return src*(1-mix) + result*mix
+        straight = np.divide(smp[..., :3], smp[..., 3:], out=np.zeros_like(colors), where=smp[..., 3:] > 0)
+        weight = np.exp(-.5*((t-np.array([1, .5, 0]))/.25)**2)
+        colors += straight * weight * (smp[..., 3:] if fixed else 1)
+        coverage += weight * (smp[..., 3:] if fixed else 1)
+        alpha += smp[..., 3:]
+    alpha /= steps
+    color = np.clip(colors / np.maximum(coverage, 1e-5), 0, 1)
+    return src*(1-mix) + np.concatenate((color*alpha, alpha), axis=2)*mix
 
 
 def checks():
@@ -80,13 +81,14 @@ if __name__ == '__main__':
         h, w = src.shape[:2]
         canvas = Image.new('RGB', (2*w, 3*(h+28)), '#20232a')
         draw = ImageDraw.Draw(canvas)
-        for row, angle in enumerate((0, 30, 90)):
-            out = render(src, radial=angle, aberration=40, steps=3)
-            yy, xx = np.mgrid[:h, :w]
-            checker = np.where(((xx//12+yy//12)%2)[..., None], .65, .4)
-            rgb = out[..., :3]+checker*(1-out[..., 3:])
-            tile = Image.fromarray(np.uint8(np.clip(rgb, 0, 1)*255))
-            canvas.paste(tile, (0, row*(h+28)+28))
-            draw.text((8, row*(h+28)+7), f'channel separation | radial {angle} | CPU reference', fill='white')
-            print(f'{angle=} alpha_min={out[...,3].min():.6f} alpha_mean={out[...,3].mean():.6f}')
+        for row, angle in enumerate((30, 90, 180)):
+            for col, fixed in enumerate((False, True)):
+                out = render(src, radial=angle, steps=128, fixed=fixed)
+                yy, xx = np.mgrid[:h, :w]
+                checker = np.where(((xx//12+yy//12)%2)[..., None], .65, .4)
+                rgb = out[..., :3]+checker*(1-out[..., 3:])
+                tile = Image.fromarray(np.uint8(np.clip(rgb, 0, 1)*255))
+                canvas.paste(tile, (col*w, row*(h+28)+28))
+                draw.text((col*w+8, row*(h+28)+7), f'{"AFTER" if fixed else "BEFORE"} | radial {angle} | CPU reference', fill='white')
+                print(f'{angle=} {fixed=} alpha_min={out[...,3].min():.6f} alpha_mean={out[...,3].mean():.6f}')
         canvas.save(sys.argv[2])

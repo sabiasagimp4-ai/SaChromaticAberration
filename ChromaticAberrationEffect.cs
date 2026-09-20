@@ -21,7 +21,7 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
     [AnimationSlider("F2", "", 0, 4)]
     public Animation Falloff { get; } = new(2, 0, 8);
 
-    [Display(Name = "ラジアル", Description = "中心から色をずらす方向。画像全体は回転しません", Order = 2)]
+    [Display(Name = "ラジアル", Description = "中心まわりにねじりながら色をずらす角度", Order = 2)]
     [AnimationSlider("F1", "°", -180, 180)]
     public Animation Radial { get; } = new(8, -YMM4Constants.VeryLargeValue, YMM4Constants.VeryLargeValue);
 
@@ -54,3 +54,4 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
 
     protected override IEnumerable<IAnimatable> GetAnimatables() => [Aberration, Falloff, Radial, Scale, CenterX, CenterY, Mix];
 }
+
