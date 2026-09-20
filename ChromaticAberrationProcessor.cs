@@ -81,6 +81,7 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         effect.RadiusScale = (float)radiusScale;
         effect.FalloffMode = (int)falloffMode;
         effect.ScaleMode = scaleMode;
+        effect.ColorSpaceMode = Math.Clamp((int)item.ColorSpace, 0, 5);
 
         //サンプル間隔が1px未満になる分は描画に効かないので、上限をずれ量に合わせて下げる
         var width = (double)bounds.Right - bounds.Left;
