@@ -17,7 +17,7 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
     [AnimationSlider("F1", "px", 0, 300)]
     public Animation Aberration { get; } = new(40, 0, YMM4Constants.VeryLargeValue);
 
-    [Display(Name = "減衰", Description = "中心から離れるほど収差が強くなる度合い。2 で逆二乗式 (中心が鮮明、周辺が大きく滲む)。0 で全面均一", Order = 1)]
+    [Display(Name = "減衰", Description = "中心から離れるほど収差が強くなる度合い。2 で距離の二乗に比例 (中心が鮮明、周辺が大きく滲む)。0 で全面均一", Order = 1)]
     [AnimationSlider("F2", "", 0, 4)]
     public Animation Falloff { get; } = new(2, 0, 8);
 
@@ -54,3 +54,4 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
 
     protected override IEnumerable<IAnimatable> GetAnimatables() => [Aberration, Falloff, Radial, Scale, CenterX, CenterY, Mix];
 }
+

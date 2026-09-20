@@ -9,7 +9,7 @@ float radialAngle;   // ねじれ角(rad)
 float scaleAmount;   // 拡大方向のずらし量(比率)
 float mixAmount;     // 合成量 0..1
 int stepCount;       // サンプル数
-float falloffPower;  // 中心からの距離に対する収差の増え方。2で逆二乗式
+float falloffPower;  // 中心からの距離に対する収差の増え方。2で距離の二乗に比例
 
 // 波長に見立てた重み。t=0が青、t=1が赤。どの t でも正の値を返すので、
 // ずらし量 0 のときは 3 チャンネルとも同じ画素を参照し、完全に入力と一致する。
@@ -25,6 +25,12 @@ D2D_PS_ENTRY(main)
     float2 p = D2DGetScenePosition().xy;
     float4 source = D2DSampleInputAtPosition(0, p);
 
+    if (mixAmount <= 0 || (aberration == 0 && radialAngle == 0 && scaleAmount == 0))
+        return source;
+
+    // Clamp to pixel centers: sampling at the boundary still blends with transparent border texels.
+    float2 sampleMin = imageRect.xy + min(0.5, (imageRect.zw - imageRect.xy) * 0.5);
+    float2 sampleMax = max(sampleMin, imageRect.zw - 0.5);
     int n = clamp(stepCount, 2, 512);
     float2 halfSize = max((imageRect.zw - imageRect.xy) * 0.5, 1e-5);
     float2 center = (imageRect.xy + imageRect.zw) * 0.5 + float2(centerOffsetX, centerOffsetY);
@@ -37,7 +43,7 @@ D2D_PS_ENTRY(main)
     float falloff = pow(rn, falloffPower);
 
     float3 sumColor = 0;
-    float3 sumWeight = 0;
+    float3 sumCoverage = 0;
     float sumAlpha = 0;
 
     [loop] for (int i = 0; i < n; ++i)
@@ -50,18 +56,20 @@ D2D_PS_ENTRY(main)
         float2 rotated = float2(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
         float2 q = center + rotated * (1.0 + scaleAmount * s) + dir * (aberration * falloff * s);
 
-        float4 smp = D2DSampleInputAtPosition(0, q);
+        float4 smp = D2DSampleInputAtPosition(0, clamp(q, sampleMin, sampleMax));
         float3 straight = smp.a > 0 ? smp.rgb / smp.a : float3(0, 0, 0);
         float3 w = spectralWeight(t);
 
-        sumColor += straight * w;
-        sumWeight += w;
+        // Alpha-weight straight color so invisible samples cannot darken visible ones.
+        sumColor += straight * smp.a * w;
+        sumCoverage += smp.a * w;
         sumAlpha += smp.a;
     }
 
-    float3 color = sumColor / max(sumWeight, 1e-5);
+    float3 color = sumColor / max(sumCoverage, 1e-5);
     float alpha = sumAlpha / (float)n;
     float4 result = float4(saturate(color) * alpha, alpha);
 
     return lerp(source, result, mixAmount);
 }
+
