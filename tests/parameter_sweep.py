@@ -1,10 +1,11 @@
 """Contact sheets that sweep every plugin parameter over the same image.
 
-Usage: python tests/parameter_sweep.py INPUT.png OUTPUT_DIR [--scale 0.5] [--cap 160]
+Usage: python tests/parameter_sweep.py INPUT.png OUTPUT_DIR [--scale=0.5] [--tile=560]
 
 Uses the CPU reference in radial_regression.py, so it reproduces the shader math
 only; it does not compile HLSL or run Direct2D. Uploaded images are not committed.
 """
+import hashlib
 import os
 import sys
 from concurrent.futures import ProcessPoolExecutor
@@ -24,8 +25,13 @@ DEFAULTS = dict(aberration=40, power=2, radius=100, mode=0, radial=8, scale=0,
                 cx=0, cy=0, steps=32, mix=100, scale_mode=0)
 
 
-def needed_steps(w, h, p, cap):
-    """Mirror of ChromaticAberrationProcessor's sample-count estimate."""
+def needed_steps(w, h, p):
+    """Mirror of ChromaticAberrationProcessor's sample-count estimate.
+
+    The Steps parameter is an upper limit, not a literal count: the processor
+    drops below it whenever the shift is too small for the extra samples to
+    land on different pixels.
+    """
     radius = min(max(p['radius'] / 100, 0.01), 100)
     power = min(max(p['power'], 0), 32)
     radial = np.deg2rad(p['radial'])
@@ -37,7 +43,7 @@ def needed_steps(w, h, p, cap):
     zoom = np.exp(min(scale_max, 16)) if p['scale_mode'] == 1 else 1 + scale_max
     slope = scale_max * zoom if p['scale_mode'] == 1 else scale_max
     need = 2 * abs(p['aberration']) * fmax + 2 * max_radius * (slope + radial_max * zoom)
-    return int(min(max(np.ceil(need), 2), cap))
+    return int(min(max(np.ceil(need), 2), p['steps']))
 
 
 SRC = None
@@ -50,15 +56,19 @@ def init_worker(src):
 
 def tile(args):
     """Render one variant. Pixel parameters arrive already scaled to the source."""
-    index, p, cap = args
+    index, p, cache = args
     src = SRC
     h, w = src.shape[:2]
-    steps = p['steps'] if p['steps'] is not None else needed_steps(w, h, p, cap)
+    steps = needed_steps(w, h, p)
+    if cache and os.path.exists(cache):
+        return index, np.asarray(Image.open(cache).convert('RGB')), steps
     out = render(src, radial=p['radial'], aberration=p['aberration'], scale=p['scale'] / 100,
                  power=p['power'], steps=steps, offset=(p['cx'], p['cy']), fixed=True,
                  mix=p['mix'] / 100, radius=p['radius'] / 100, mode=p['mode'],
                  scale_mode=p['scale_mode'])
     rgb = np.uint8(np.clip(out[..., :3] + (1 - out[..., 3:]), 0, 1) * 255)
+    if cache:
+        Image.fromarray(rgb).save(cache)
     return index, rgb, steps
 
 
@@ -71,8 +81,8 @@ def sweep(name, note, values, **overrides):
 def rows():
     d = DEFAULTS
     return [
-        [sweep('収差', '中心から外へ色をずらす量。効果の主役', [
-            ('0 px（無効）', dict(aberration=0)), ('10 px', dict(aberration=10)),
+        [sweep('収差', '中心から外へ色をずらす量。効果の主役。0pxでも既定のラジアル8°は効く', [
+            ('0 px（ラジアル8°だけ残る）', dict(aberration=0)), ('10 px', dict(aberration=10)),
             (f'{d["aberration"]} px（既定）', dict(aberration=40)),
             ('150 px', dict(aberration=150)), ('600 px', dict(aberration=600))]),
          sweep('減衰', '収差120pxで比較。0は全面均一、大きいほど周辺だけに集中', [
@@ -118,8 +128,9 @@ def rows():
     ]
 
 
-def build(src_path, out_dir, scale, cap, tile_w):
-    os.makedirs(out_dir, exist_ok=True)
+def build(src_path, out_dir, scale, tile_w):
+    cache_dir = os.path.join(out_dir, 'tiles')
+    os.makedirs(cache_dir, exist_ok=True)
     full = Image.open(src_path).convert('RGBA')
     w, h = int(round(full.width * scale)), int(round(full.height * scale))
     src = np.asarray(full.resize((w, h), Image.LANCZOS), dtype=float) / 255
@@ -133,8 +144,9 @@ def build(src_path, out_dir, scale, cap, tile_w):
             for label, p in row['variants']:
                 px = dict(p, aberration=p['aberration'] * scale,
                           cx=p['cx'] * scale, cy=p['cy'] * scale)
+                key = hashlib.sha1(f'{sorted(px.items())}|{w}x{h}'.encode()).hexdigest()[:16]
                 tiles.append((len(jobs), label))
-                jobs.append((len(jobs), px, cap))
+                jobs.append((len(jobs), px, os.path.join(cache_dir, f'{key}.png')))
             sheet_layout.append((row['name'], row['note'], tiles))
         layout.append(sheet_layout)
     print(f'{len(jobs)} tiles at {w}x{h}', flush=True)
@@ -188,5 +200,4 @@ def build(src_path, out_dir, scale, cap, tile_w):
 if __name__ == '__main__':
     args = [a for a in sys.argv[1:] if not a.startswith('--')]
     opts = dict(a.lstrip('-').split('=') for a in sys.argv[1:] if a.startswith('--'))
-    build(args[0], args[1], float(opts.get('scale', 0.5)), int(opts.get('cap', 160)),
-          int(opts.get('tile', 560)))
+    build(args[0], args[1], float(opts.get('scale', 0.5)), int(opts.get('tile', 560)))
