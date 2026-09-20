@@ -1,0 +1,67 @@
+#define D2D_ENTRY main
+#include <d2d1effecthelpers.hlsli>
+
+float4 imageRect;    // left, top, right, bottom (シーン座標)
+float centerOffsetX; // 中心のずらし量(px)
+float centerOffsetY;
+float aberration;    // 半径方向のずらし量(px)
+float radialAngle;   // ねじれ角(rad)
+float scaleAmount;   // 拡大方向のずらし量(比率)
+float mixAmount;     // 合成量 0..1
+int stepCount;       // サンプル数
+float falloffPower;  // 中心からの距離に対する収差の増え方。2で逆二乗式
+
+// 波長に見立てた重み。t=0が青、t=1が赤。どの t でも正の値を返すので、
+// ずらし量 0 のときは 3 チャンネルとも同じ画素を参照し、完全に入力と一致する。
+float3 spectralWeight(float t)
+{
+    float3 mu = float3(1.0, 0.5, 0.0);
+    float3 d = (t - mu) / 0.25;
+    return exp(-0.5 * d * d);
+}
+
+D2D_PS_ENTRY(main)
+{
+    float2 p = D2DGetScenePosition().xy;
+    float4 source = D2DSampleInputAtPosition(0, p);
+
+    int n = clamp(stepCount, 2, 512);
+    float2 halfSize = max((imageRect.zw - imageRect.xy) * 0.5, 1e-5);
+    float2 center = (imageRect.xy + imageRect.zw) * 0.5 + float2(centerOffsetX, centerOffsetY);
+    float2 d = p - center;
+    float r = length(d);
+    float2 dir = r > 1e-5 ? d / r : float2(0, 0);
+
+    //中心で0、画面端の中点で1になる正規化半径。縦横で割るので等高線は画面比と同じ楕円になる
+    float rn = length(d / halfSize);
+    float falloff = pow(rn, falloffPower);
+
+    float3 sumColor = 0;
+    float3 sumWeight = 0;
+    float sumAlpha = 0;
+
+    [loop] for (int i = 0; i < n; ++i)
+    {
+        float t = (float)i / (float)(n - 1);
+        float s = t * 2.0 - 1.0;
+
+        float a = radialAngle * s;
+        float ca = cos(a), sa = sin(a);
+        float2 rotated = float2(d.x * ca - d.y * sa, d.x * sa + d.y * ca);
+        float2 q = center + rotated * (1.0 + scaleAmount * s) + dir * (aberration * falloff * s);
+
+        float4 smp = D2DSampleInputAtPosition(0, q);
+        float3 straight = smp.a > 0 ? smp.rgb / smp.a : float3(0, 0, 0);
+        float3 w = spectralWeight(t);
+
+        sumColor += straight * w;
+        sumWeight += w;
+        sumAlpha += smp.a;
+    }
+
+    float3 color = sumColor / max(sumWeight, 1e-5);
+    float alpha = sumAlpha / (float)n;
+    float4 result = float4(saturate(color) * alpha, alpha);
+
+    return lerp(source, result, mixAmount);
+}

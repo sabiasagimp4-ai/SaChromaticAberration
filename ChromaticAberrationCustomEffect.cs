@@ -1,0 +1,146 @@
+using System.Numerics;
+using System.Runtime.InteropServices;
+using Vortice;
+using Vortice.Direct2D1;
+using YukkuriMovieMaker.Commons;
+using YukkuriMovieMaker.Player.Video;
+
+namespace SaChromaticAberration;
+
+internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext devices)
+    : D2D1CustomShaderEffectBase(Create<ChromaticAberrationCustomEffect.Impl>(devices))
+{
+    public Vector4 ImageRect { set => SetValue((int)Impl.Properties.ImageRect, value); }
+    public float CenterOffsetX { set => SetValue((int)Impl.Properties.CenterOffsetX, value); }
+    public float CenterOffsetY { set => SetValue((int)Impl.Properties.CenterOffsetY, value); }
+    public float Aberration { set => SetValue((int)Impl.Properties.Aberration, value); }
+    public float RadialAngle { set => SetValue((int)Impl.Properties.RadialAngle, value); }
+    public float ScaleAmount { set => SetValue((int)Impl.Properties.ScaleAmount, value); }
+    public float MixAmount { set => SetValue((int)Impl.Properties.MixAmount, value); }
+    public int StepCount { set => SetValue((int)Impl.Properties.StepCount, value); }
+    public float FalloffPower { set => SetValue((int)Impl.Properties.FalloffPower, value); }
+
+    [CustomEffect(1)]
+    internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
+    {
+        Constants constants;
+
+        [CustomEffectProperty(PropertyType.Vector4, (int)Properties.ImageRect)]
+        public Vector4 ImageRect { get => constants.ImageRect; set { constants.ImageRect = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.CenterOffsetX)]
+        public float CenterOffsetX { get => constants.CenterOffsetX; set { constants.CenterOffsetX = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.CenterOffsetY)]
+        public float CenterOffsetY { get => constants.CenterOffsetY; set { constants.CenterOffsetY = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.Aberration)]
+        public float Aberration { get => constants.Aberration; set { constants.Aberration = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.RadialAngle)]
+        public float RadialAngle { get => constants.RadialAngle; set { constants.RadialAngle = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.ScaleAmount)]
+        public float ScaleAmount { get => constants.ScaleAmount; set { constants.ScaleAmount = value; UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.MixAmount)]
+        public float MixAmount { get => constants.MixAmount; set { constants.MixAmount = Math.Clamp(value, 0f, 1f); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.StepCount)]
+        public int StepCount { get => constants.StepCount; set { constants.StepCount = Math.Clamp(value, 2, 512); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.FalloffPower)]
+        public float FalloffPower { get => constants.FalloffPower; set { constants.FalloffPower = Math.Clamp(value, 0f, 8f); UpdateConstants(); } }
+
+        public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
+
+        protected override void UpdateConstants() => drawInformation?.SetPixelShaderConstantBuffer(constants);
+
+        public override void MapInputRectsToOutputRect(RawRect[] inputRects, RawRect[] inputOpaqueSubRects, out RawRect outputRect, out RawRect outputOpaqueSubRect)
+        {
+            inputRect = inputRects[0];
+            //出力側: 半径Rの出力画素は R*(1-scale) を読むので、R <= Rimg/(1-scale) まで色が乗る
+            var scale = Math.Abs(constants.ScaleAmount);
+            outputRect = Expand(inputRects[0], scale / Math.Max(1 - scale, 0.1));
+            outputOpaqueSubRect = default;
+        }
+
+        public override void MapOutputRectToInputRects(RawRect outputRect, RawRect[] inputRects)
+        {
+            //入力側: 半径Rの出力画素は R*(1+scale) まで読む
+            inputRects[0] = Expand(outputRect, Math.Abs(constants.ScaleAmount));
+        }
+
+        /// <summary>サンプル位置が矩形外へ出る分を見込んで矩形を広げる。</summary>
+        RawRect Expand(RawRect rect, double scaleFactor)
+        {
+            var (width, height) = Size(rect);
+            var aberration = Math.Abs(constants.Aberration) * FalloffMax(width, height, constants.FalloffPower, constants.CenterOffsetX, constants.CenterOffsetY);
+            var margin = (int)Math.Ceiling(Math.Clamp(MaxRadius(rect) * (scaleFactor + 2 * Math.Abs(Math.Sin(constants.RadialAngle / 2))) + aberration, 0, 4096));
+
+            return new RawRect(
+                (int)Math.Max(rect.Left - (long)margin, int.MinValue / 2),
+                (int)Math.Max(rect.Top - (long)margin, int.MinValue / 2),
+                (int)Math.Min(rect.Right + (long)margin, int.MaxValue / 2),
+                (int)Math.Min(rect.Bottom + (long)margin, int.MaxValue / 2));
+        }
+
+        /// <summary>中心から最も遠い画素までの距離。D2Dが矩形を分割しても変わらないよう、画像全体の矩形から求める。</summary>
+        double MaxRadius(RawRect fallback)
+        {
+            var (width, height) = Size(fallback);
+
+            //中心をずらすと、最も遠い画素までの距離が伸びる
+            var offset = Math.Sqrt((double)constants.CenterOffsetX * constants.CenterOffsetX + (double)constants.CenterOffsetY * constants.CenterOffsetY);
+            return Math.Sqrt(width * width + height * height) / 2 + offset;
+        }
+
+        /// <summary>画像全体の大きさ。取れないときは渡された矩形で代用する。</summary>
+        (double Width, double Height) Size(RawRect fallback)
+        {
+            var width = (double)constants.ImageRect.Z - constants.ImageRect.X;
+            var height = (double)constants.ImageRect.W - constants.ImageRect.Y;
+            if (!double.IsFinite(width) || !double.IsFinite(height) || width <= 0 || height <= 0)
+            {
+                width = (double)fallback.Right - fallback.Left;
+                height = (double)fallback.Bottom - fallback.Top;
+            }
+            return (width, height);
+        }
+
+        /// <summary>収差量に掛かる距離係数の最大値。正規化半径が最大になるのは中心から最も遠い角。</summary>
+        internal static double FalloffMax(double width, double height, double power, double offsetX = 0, double offsetY = 0)
+        {
+            var nx = 1 + Math.Abs(offsetX) / Math.Max(width / 2, 1e-5);
+            var ny = 1 + Math.Abs(offsetY) / Math.Max(height / 2, 1e-5);
+            return Math.Pow(Math.Sqrt(nx * nx + ny * ny), power);
+        }
+
+        [StructLayout(LayoutKind.Sequential)]
+        struct Constants
+        {
+            public Vector4 ImageRect;
+            public float CenterOffsetX;
+            public float CenterOffsetY;
+            public float Aberration;
+            public float RadialAngle;
+            public float ScaleAmount;
+            public float MixAmount;
+            public int StepCount;
+            public float FalloffPower;
+        }
+
+        internal enum Properties
+        {
+            ImageRect = 0,
+            CenterOffsetX = 1,
+            CenterOffsetY = 2,
+            Aberration = 3,
+            RadialAngle = 4,
+            ScaleAmount = 5,
+            MixAmount = 6,
+            StepCount = 7,
+            FalloffPower = 8,
+        }
+    }
+}

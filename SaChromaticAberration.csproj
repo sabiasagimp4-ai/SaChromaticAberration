@@ -1,0 +1,32 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+    <AssemblyName>SaChromaticAberration</AssemblyName>
+    <RootNamespace>SaChromaticAberration</RootNamespace>
+    <Deterministic>true</Deterministic>
+    <PathMap>$(MSBuildProjectDirectory)=/_/</PathMap>
+    <FxcPath Condition="'$(FxcPath)' == ''">$(WindowsSdkBinPath)x64\fxc.exe</FxcPath>
+    <D2DIncludePath Condition="'$(D2DIncludePath)' == ''">$(WindowsSdkDir)Include\$(WindowsTargetPlatformVersion)\um</D2DIncludePath>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Reference Include="YukkuriMovieMaker.Controls"><HintPath>$(YMM4DirPath)YukkuriMovieMaker.Controls.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="YukkuriMovieMaker.Plugin"><HintPath>$(YMM4DirPath)YukkuriMovieMaker.Plugin.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SharpGen.Runtime"><HintPath>$(YMM4DirPath)SharpGen.Runtime.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="SharpGen.Runtime.COM"><HintPath>$(YMM4DirPath)SharpGen.Runtime.COM.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Vortice.Direct2D1"><HintPath>$(YMM4DirPath)Vortice.Direct2D1.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Vortice.DirectX"><HintPath>$(YMM4DirPath)Vortice.DirectX.dll</HintPath><Private>false</Private></Reference>
+    <Reference Include="Vortice.Mathematics"><HintPath>$(YMM4DirPath)Vortice.Mathematics.dll</HintPath><Private>false</Private></Reference>
+    <EmbeddedResource Include="$(IntermediateOutputPath)ChromaticAberration.cso" LogicalName="SaChromaticAberration.ChromaticAberration.cso" />
+  </ItemGroup>
+
+  <Target Name="CompileShaders" BeforeTargets="PrepareResources" Inputs="Shaders\ChromaticAberration.hlsl" Outputs="$(IntermediateOutputPath)ChromaticAberration.cso">
+    <Error Condition="!Exists('$(FxcPath)')" Text="fxc.exe was not found. Set -p:FxcPath to the Windows SDK x64 fxc.exe path." />
+    <MakeDir Directories="$(IntermediateOutputPath)" />
+    <Exec Command="&quot;$(FxcPath)&quot; /nologo /I &quot;$(D2DIncludePath)&quot; /D D2D_INPUT_COUNT=1 /T ps_4_0 /E main /Fo &quot;$(IntermediateOutputPath)ChromaticAberration.cso&quot; &quot;$(MSBuildProjectDirectory)\Shaders\ChromaticAberration.hlsl&quot;" />
+  </Target>
+</Project>
