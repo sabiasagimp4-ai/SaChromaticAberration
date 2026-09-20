@@ -22,6 +22,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
     public float RadiusScale { set => SetValue((int)Impl.Properties.RadiusScale, value); }
     public int FalloffMode { set => SetValue((int)Impl.Properties.FalloffMode, value); }
     public int ScaleMode { set => SetValue((int)Impl.Properties.ScaleMode, value); }
+    public int ColorSpaceMode { set => SetValue((int)Impl.Properties.ColorSpaceMode, value); }
 
     [CustomEffect(1)]
     internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
@@ -63,6 +64,9 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
 
         [CustomEffectProperty(PropertyType.Int32, (int)Properties.ScaleMode)]
         public int ScaleMode { get => constants.ScaleMode; set { constants.ScaleMode = Math.Clamp(value, 0, 1); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.ColorSpaceMode)]
+        public int ColorSpaceMode { get => constants.ColorSpaceMode; set { constants.ColorSpaceMode = Math.Clamp(value, 0, 5); UpdateConstants(); } }
 
         public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
 
@@ -106,6 +110,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             public float RadiusScale;
             public int FalloffMode;
             public int ScaleMode;
+            public int ColorSpaceMode;
         }
 
         internal enum Properties
@@ -122,6 +127,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             RadiusScale = 9,
             FalloffMode = 10,
             ScaleMode = 11,
+            ColorSpaceMode = 12,
         }
     }
 }
