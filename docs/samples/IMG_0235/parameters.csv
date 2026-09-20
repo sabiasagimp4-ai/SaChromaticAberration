@@ -1,0 +1,9 @@
+name,label,aberration_px,falloff,radius_percent,radial_deg,scale_percent,mix_percent,spectral_width_percent,steps,mode
+00_cropped_original,Original / 1920x1080,0,2,100,0,0,0,100,2,power
+01_subtle_prism,Subtle prism,22,2,100,0,0,100,100,24,power
+02_edge_split,Edge split,75,2,100,0,0,100,80,32,power
+03_twisted_spectrum,Twisted spectrum,42,2,100,26,0,100,85,32,power
+04_zoom_prism,Zoom prism,28,2.5,100,4,24,100,100,32,power
+05_localized_exponential,Localized exponential,58,4,58,12,12,100,70,40,exponential
+06_narrow_spectral,Narrow RGB separation,46,2,100,0,0,100,28,32,power
+07_soft_mix,Soft mix,100,2,100,18,18,44,100,40,power

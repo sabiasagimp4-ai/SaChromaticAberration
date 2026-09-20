@@ -44,6 +44,29 @@ YMM4 用の映像エフェクトプラグインです。Crate's Chromatic Aberra
 - この変更で既存の線形方式も絶対値方式となり、旧適用先の設定は使用しません。旧バージョンで作成したプロジェクトも見た目が変わります。サンプル数推定には共通の距離係数と倍率を含めます。
 - 半径の形は従来と同じ画面比の楕円です。真円への変更ではありません。
 
+
+## 写真での色収差サンプル
+
+実際の写真に SaChromaticAberration を適用した比較です。元画像は 900×506 px で、16:9 に合わせて 1920×1080 px に変換しています（元画像がほぼ 16:9 のため、トリミング量はごくわずかです）。
+
+![色収差サンプル比較](docs/samples/IMG_0235/gallery.jpg)
+
+同じ入力に対して、収差量・減衰・半径・ラジアル・スケール・色の重なり幅・合成量を変えています。左上が基準画像です。
+
+| サンプル | 主な設定 | 見え方 |
+| --- | --- | --- |
+| [01_subtle_prism.jpg](docs/samples/IMG_0235/01_subtle_prism.jpg) | 収差 22 px / 減衰 2 | 弱めのプリズム状 RGB ずれ |
+| [02_edge_split.jpg](docs/samples/IMG_0235/02_edge_split.jpg) | 収差 75 px / 減衰 2 | 画面周辺の色分離を強調 |
+| [03_twisted_spectrum.jpg](docs/samples/IMG_0235/03_twisted_spectrum.jpg) | 収差 42 px / ラジアル 26° | 周辺がねじれる色収差 |
+| [04_zoom_prism.jpg](docs/samples/IMG_0235/04_zoom_prism.jpg) | 収差 28 px / スケール 24% | 色ごとに拡大率が変わる変形 |
+| [05_localized_exponential.jpg](docs/samples/IMG_0235/05_localized_exponential.jpg) | 収差 58 px / 半径 58% / 指数 | 中心を比較的保った急峻な変形 |
+| [06_narrow_spectral.jpg](docs/samples/IMG_0235/06_narrow_spectral.jpg) | 収差 46 px / 色の重なり幅 28% | RGB の分離を明確化 |
+| [07_soft_mix.jpg](docs/samples/IMG_0235/07_soft_mix.jpg) | 収差 100 px / 強さ 44% | 強い変形を元画像に薄く合成 |
+
+[全サンプルの比較画像](docs/samples/IMG_0235/gallery.jpg) / [全パラメータ CSV](docs/samples/IMG_0235/parameters.csv)
+
+この比較画像は、\`Shaders/ChromaticAberration.hlsl\` の分光サンプリング、共通減衰、ラジアル回転、スケール変形を同じ数式で静止画に適用したものです。YMM4 では入力サイズ、GPU の補間、フレームごとのアニメーションによって見え方が少し変わる場合があります。
+
 ## ビルド手順
 
 .NET 10 SDK と Windows SDK (fxc.exe) が必要です。
