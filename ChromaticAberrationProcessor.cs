@@ -69,6 +69,7 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         var radiusScale = Math.Clamp(item.Radius.GetValue(frame, length, fps) / 100d, 0.01d, 100d);
         var falloffMode = item.FalloffMode;
         var scaleMode = Math.Clamp((int)item.ScaleMode, 0, 1);
+        var colorSpace = Math.Clamp((int)item.ColorSpace, 0, 15);
 
         effect.ImageRect = new Vector4(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
         effect.CenterOffsetX = (float)centerX;
@@ -81,6 +82,7 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         effect.RadiusScale = (float)radiusScale;
         effect.FalloffMode = (int)falloffMode;
         effect.ScaleMode = scaleMode;
+        effect.ColorSpace = colorSpace;
 
         //サンプル間隔が1px未満になる分は描画に効かないので、上限をずれ量に合わせて下げる
         var width = (double)bounds.Right - bounds.Left;

@@ -32,6 +32,57 @@ public enum ChromaticFalloffMode
     Exponential = 4,
 }
 
+public enum ChromaticColorSpace
+{
+    [Display(Name = "RGB")]
+    Rgb = 0,
+
+    [Display(Name = "RSS-1 Reversible Sine Shear")]
+    Rss1 = 1,
+
+    [Display(Name = "FSS-1 Golden Shear")]
+    Fss1 = 2,
+
+    [Display(Name = "CSL-1 Complex Spiral")]
+    Csl1 = 3,
+
+    [Display(Name = "HCS-1 Hyperbolic Cross")]
+    Hcs1 = 4,
+
+    [Display(Name = "PHS-1 Prime Harmonic")]
+    Phs1 = 5,
+
+    [Display(Name = "CSM-1 Standard Map")]
+    Csm1 = 6,
+
+    [Display(Name = "KSM-1 Kicked Standard")]
+    Ksm1 = 7,
+
+    [Display(Name = "CFE-1 Continued Fraction")]
+    Cfe1 = 8,
+
+    [Display(Name = "ANO-1 Anosov Torus")]
+    Ano1 = 9,
+
+    [Display(Name = "CAT-2 Optical Catastrophe")]
+    Cat2 = 10,
+
+    [Display(Name = "BRD-2 Braid Catastrophe")]
+    Brd2 = 11,
+
+    [Display(Name = "TOR-2 Integer Torus")]
+    Tor2 = 12,
+
+    [Display(Name = "STD-2 Double Standard")]
+    Std2 = 13,
+
+    [Display(Name = "QRO-2 Quaternion Ribbon")]
+    Qro2 = 14,
+
+    [Display(Name = "HBP-2 Hyperbolic Prism")]
+    Hbp2 = 15,
+}
+
 [VideoEffect("Sa_chromablur", ["フィルタ"], ["Sa_chromablur", "色収差", "chromatic aberration", "プリズム", "RGBずれ", "レンズ"], IsAviUtlSupported = false)]
 public sealed class ChromaticAberrationEffect : VideoEffectBase
 {
@@ -85,6 +136,11 @@ public sealed class ChromaticAberrationEffect : VideoEffectBase
     [EnumComboBox]
     public ChromaticScaleMode ScaleMode { get => scaleMode; set => Set(ref scaleMode, value); }
     ChromaticScaleMode scaleMode = ChromaticScaleMode.Absolute;
+
+    [Display(Name = "色空間", Description = "色を分ける座標系。RGBが従来と同じ動作です", Order = 11)]
+    [EnumComboBox]
+    public ChromaticColorSpace ColorSpace { get => colorSpace; set => Set(ref colorSpace, value); }
+    ChromaticColorSpace colorSpace = ChromaticColorSpace.Rgb;
 
     public override IEnumerable<string> CreateExoVideoFilters(int keyFrameIndex, ExoOutputDescription exoOutputDescription) => [];
 

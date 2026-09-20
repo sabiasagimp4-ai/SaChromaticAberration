@@ -22,6 +22,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
     public float RadiusScale { set => SetValue((int)Impl.Properties.RadiusScale, value); }
     public int FalloffMode { set => SetValue((int)Impl.Properties.FalloffMode, value); }
     public int ScaleMode { set => SetValue((int)Impl.Properties.ScaleMode, value); }
+    public int ColorSpace { set => SetValue((int)Impl.Properties.ColorSpace, value); }
 
     [CustomEffect(1)]
     internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
@@ -64,6 +65,9 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
         [CustomEffectProperty(PropertyType.Int32, (int)Properties.ScaleMode)]
         public int ScaleMode { get => constants.ScaleMode; set { constants.ScaleMode = Math.Clamp(value, 0, 1); UpdateConstants(); } }
 
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.ColorSpace)]
+        public int ColorSpace { get => constants.ColorSpace; set { constants.ColorSpace = Math.Clamp(value, 0, 15); UpdateConstants(); } }
+
         public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
 
         protected override void UpdateConstants() => drawInformation?.SetPixelShaderConstantBuffer(constants);
@@ -91,6 +95,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             return Math.Pow(Math.Sqrt(nx * nx + ny * ny), power);
         }
 
+        // Four 16-byte constant-buffer rows. ColorSpace occupies the old padding slot,
+        // so adding the selector does not change the shader buffer size.
         [StructLayout(LayoutKind.Sequential, Size = 64)]
         struct Constants
         {
@@ -106,6 +112,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             public float RadiusScale;
             public int FalloffMode;
             public int ScaleMode;
+            public int ColorSpace;
         }
 
         internal enum Properties
@@ -122,6 +129,7 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             RadiusScale = 9,
             FalloffMode = 10,
             ScaleMode = 11,
+            ColorSpace = 12,
         }
     }
 }
