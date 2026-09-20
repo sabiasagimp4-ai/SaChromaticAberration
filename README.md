@@ -60,10 +60,8 @@ dotnet build .\SaChromaticAberration.csproj -c Release "-p:YMM4DirPath=$Ymm4DirP
 `.github/workflows/release.yml` が Windows ランナー上でビルドし、`.ymme` を GitHub Release に添付します。
 fxc.exe と Direct2D のヘッダーは Windows SDK にしか無いので、ビルドは Windows 上でしか通りません。
 
-1. リポジトリの `Settings` → `Secrets and variables` → `Actions` → `Variables` で
-   `YMM4_DOWNLOAD_URL` に YMM4 アーカイブの直リンクを設定します。
-   参照アセンブリ (`YukkuriMovieMaker.Plugin.dll` など) は NuGet に無く YMM4 本体にしか同梱されないため、
-   CI も開発者と同じ方法で取得する必要があります。
+1. 既定では[公式配布ページ](https://manjubox.net/ymm4/)の YMM4 Lite アーカイブを取得します。追加設定は不要です。
+   特定バージョンを使う場合のみ、Actions のリポジトリ変数 `YMM4_DOWNLOAD_URL` または手動入力 `ymm4_url` で取得先を上書きできます。
 2. `v` で始まるタグを push すると、ビルドから Release への添付までが自動で走ります。
    `Actions` タブから手動実行し、`tag` と `ymm4_url` を直接渡すこともできます。
 
