@@ -7,17 +7,38 @@ import numpy as np
 from PIL import Image, ImageDraw
 
 
+def falloff_value(radius, power, mode):
+    radius = np.maximum(radius, 0)
+    exponent = max(float(power), 0.0)
+    if mode == 1:
+        exponent = max(exponent, 3.0)
+    elif mode == 2:
+        exponent = max(exponent, 4.0)
+    elif mode == 3:
+        exponent = max(exponent, 6.0)
+    elif mode == 4:
+        exponent = max(exponent, 2.0)
+        with np.errstate(over='ignore', invalid='ignore'):
+            value = (np.exp2(np.minimum(radius * exponent, 64.0)) - 1.0) / max(np.exp2(exponent) - 1.0, 1e-5)
+        return np.nan_to_num(np.minimum(value, 1e6), nan=1e6, posinf=1e6)
+    if exponent <= 0:
+        return np.ones_like(radius)
+    with np.errstate(over='ignore', invalid='ignore'):
+        value = np.power(radius, exponent)
+    return np.nan_to_num(np.minimum(value, 1e6), nan=1e6, posinf=1e6)
+
+
 def render(src, radial=90, aberration=40, scale=0, power=2, steps=128,
-           offset=(0, 0), fixed=True, mix=1):
+           offset=(0, 0), fixed=True, mix=1, radius=1, mode=0):
     h, w = src.shape[:2]
     if fixed and (mix == 0 or (radial == 0 and aberration == 0 and scale == 0)):
         return src.copy()
     y, x = np.mgrid[:h, :w].astype(float)
     cx, cy = w / 2 + offset[0], h / 2 + offset[1]
     dx, dy = x + .5 - cx, y + .5 - cy
-    radius = np.hypot(dx, dy)
-    ux, uy = dx / np.maximum(radius, 1e-5), dy / np.maximum(radius, 1e-5)
-    falloff = np.hypot(dx / (w / 2), dy / (h / 2)) ** power
+    distance = np.hypot(dx, dy)
+    ux, uy = dx / np.maximum(distance, 1e-5), dy / np.maximum(distance, 1e-5)
+    falloff = falloff_value(np.hypot(dx / (w / 2), dy / (h / 2)) / max(radius, 1e-4), power, mode)
     colors = np.zeros((h, w, 3))
     coverage = np.zeros_like(colors)
     alpha = np.zeros((h, w, 1))
@@ -54,12 +75,21 @@ def checks():
     rng = np.random.default_rng(41)
     opaque = rng.random((13, 23, 4)); opaque[..., 3] = 1
     count = 0
+    for power in (2, 8, 32):
+        assert np.allclose(falloff_value(np.array([1.0]), power, 4), 1.0), power
     for radial in (-720, -180, -90, 0, 90, 180, 720):
         for scale in (-1, 0, 1):
             out = render(opaque, radial=radial, scale=scale, offset=(41, -27), steps=32)
             assert np.allclose(out[..., 3], 1), (radial, scale)
             assert np.isfinite(out).all()
             count += 1
+    for mode in range(5):
+        for radius in (0.01, 0.1, 1, 10, 100):
+            out = render(opaque, radial=720, aberration=3000, scale=3,
+                         power=32, radius=radius, mode=mode, steps=64,
+                         offset=(200, -180))
+            assert np.allclose(out[..., 3], 1), (mode, radius)
+            assert np.isfinite(out).all(), (mode, radius)
     transparent = np.zeros_like(opaque)
     assert np.array_equal(render(transparent), transparent)
     semi = np.ones_like(opaque)*.4

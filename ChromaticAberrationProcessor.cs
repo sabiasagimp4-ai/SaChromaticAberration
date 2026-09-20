@@ -65,7 +65,9 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         var aberration = item.Aberration.GetValue(frame, length, fps);
         var radialAngle = item.Radial.GetValue(frame, length, fps) * Math.PI / 180d;
         var scaleAmount = item.Scale.GetValue(frame, length, fps) / 100d;
-        var falloffPower = Math.Clamp(item.Falloff.GetValue(frame, length, fps), 0d, 8d);
+        var falloffPower = Math.Clamp(item.Falloff.GetValue(frame, length, fps), 0d, 32d);
+        var radiusScale = Math.Clamp(item.Radius.GetValue(frame, length, fps) / 100d, 0.01d, 100d);
+        var falloffMode = item.FalloffMode;
 
         effect.ImageRect = new Vector4(bounds.Left, bounds.Top, bounds.Right, bounds.Bottom);
         effect.CenterOffsetX = (float)centerX;
@@ -75,13 +77,27 @@ internal sealed class ChromaticAberrationProcessor : IVideoEffectProcessor
         effect.ScaleAmount = (float)scaleAmount;
         effect.MixAmount = (float)(item.Mix.GetValue(frame, length, fps) / 100d);
         effect.FalloffPower = (float)falloffPower;
+        effect.RadiusScale = (float)radiusScale;
+        effect.FalloffMode = (int)falloffMode;
 
         //サンプル間隔が1px未満になる分は描画に効かないので、上限をずれ量に合わせて下げる
         var width = (double)bounds.Right - bounds.Left;
         var height = (double)bounds.Bottom - bounds.Top;
         var maxRadius = Math.Sqrt(width * width + height * height) / 2 + Math.Sqrt(centerX * centerX + centerY * centerY);
-        //収差は中心から離れるほど強くなるので、最も強い角を基準にする
-        var falloffMax = ChromaticAberrationCustomEffect.Impl.FalloffMax(width, height, falloffPower, centerX, centerY);
+        //収差は中心から離れるほど強くなるので、最も強い角を基準にする。
+        var normalizedMax = ChromaticAberrationCustomEffect.Impl.FalloffMax(width, height, 1d, centerX, centerY) / radiusScale;
+        var effectivePower = falloffMode switch
+        {
+            ChromaticFalloffMode.Cubic => Math.Max(falloffPower, 3d),
+            ChromaticFalloffMode.Quartic => Math.Max(falloffPower, 4d),
+            ChromaticFalloffMode.Sextic => Math.Max(falloffPower, 6d),
+            ChromaticFalloffMode.Exponential => Math.Max(falloffPower, 2d),
+            _ => Math.Max(falloffPower, 0d),
+        };
+        var falloffMax = falloffMode == ChromaticFalloffMode.Exponential
+            ? (Math.Pow(2d, Math.Min(effectivePower * normalizedMax, 64d)) - 1d) / Math.Max(Math.Pow(2d, effectivePower) - 1d, 1e-5d)
+            : Math.Pow(Math.Max(normalizedMax, 0d), effectivePower);
+        falloffMax = Math.Clamp(falloffMax, 0d, 1e6d);
         var needed = 2 * Math.Abs(aberration) * falloffMax + 2 * maxRadius * (Math.Abs(scaleAmount) + Math.Abs(radialAngle));
         effect.StepCount = (int)Math.Clamp(Math.Ceiling(needed), 2, item.Steps);
 

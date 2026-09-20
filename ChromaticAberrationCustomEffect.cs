@@ -19,6 +19,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
     public float MixAmount { set => SetValue((int)Impl.Properties.MixAmount, value); }
     public int StepCount { set => SetValue((int)Impl.Properties.StepCount, value); }
     public float FalloffPower { set => SetValue((int)Impl.Properties.FalloffPower, value); }
+    public float RadiusScale { set => SetValue((int)Impl.Properties.RadiusScale, value); }
+    public int FalloffMode { set => SetValue((int)Impl.Properties.FalloffMode, value); }
 
     [CustomEffect(1)]
     internal sealed class Impl : D2D1CustomShaderEffectImplBase<Impl>
@@ -47,10 +49,16 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
         public float MixAmount { get => constants.MixAmount; set { constants.MixAmount = Math.Clamp(value, 0f, 1f); UpdateConstants(); } }
 
         [CustomEffectProperty(PropertyType.Int32, (int)Properties.StepCount)]
-        public int StepCount { get => constants.StepCount; set { constants.StepCount = Math.Clamp(value, 2, 512); UpdateConstants(); } }
+        public int StepCount { get => constants.StepCount; set { constants.StepCount = Math.Clamp(value, 2, 2048); UpdateConstants(); } }
 
         [CustomEffectProperty(PropertyType.Float, (int)Properties.FalloffPower)]
-        public float FalloffPower { get => constants.FalloffPower; set { constants.FalloffPower = Math.Clamp(value, 0f, 8f); UpdateConstants(); } }
+        public float FalloffPower { get => constants.FalloffPower; set { constants.FalloffPower = Math.Clamp(value, 0f, 32f); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Float, (int)Properties.RadiusScale)]
+        public float RadiusScale { get => constants.RadiusScale; set { constants.RadiusScale = Math.Clamp(value, 0.01f, 100f); UpdateConstants(); } }
+
+        [CustomEffectProperty(PropertyType.Int32, (int)Properties.FalloffMode)]
+        public int FalloffMode { get => constants.FalloffMode; set { constants.FalloffMode = Math.Clamp(value, 0, 4); UpdateConstants(); } }
 
         public Impl() : base(ShaderResourceLoader.Get("ChromaticAberration")) { }
 
@@ -91,6 +99,9 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             public float MixAmount;
             public int StepCount;
             public float FalloffPower;
+            public float RadiusScale;
+            public int FalloffMode;
+            public Vector2 Padding;
         }
 
         internal enum Properties
@@ -104,7 +115,8 @@ internal sealed class ChromaticAberrationCustomEffect(IGraphicsDevicesAndContext
             MixAmount = 6,
             StepCount = 7,
             FalloffPower = 8,
+            RadiusScale = 9,
+            FalloffMode = 10,
         }
     }
 }
-
